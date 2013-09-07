@@ -1,7 +1,7 @@
 go_cwd_logger
 =============
 
-Rewrite of [cwd_logger](/glennsb/cwd_logger) in Go
+Rewrite of [cwd_logger](https://github.com/glennsb/cwd_logger) in Go
 
 A simple MongoDB backed working directory logging system to provide quick
 access to frequent or recent directories for a unix type system.
@@ -57,7 +57,7 @@ It will use a collection named `logged_dirs` in the given database
 
 ### Why
 
-I liked the old [cwd logger](/glennsb/cwd_logger), but was tired of Ruby's gem
+I liked the old [cwd_logger](https://github.com/glennsb/cwd_logger), but was tired of Ruby's gem
 dependency issues. I also wanted to play with Go more this morning
 
 ### License
