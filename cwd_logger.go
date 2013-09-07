@@ -122,7 +122,7 @@ func main () {
     collection := sess.DB("").C("logged_dirs")
 
     switch os.Args[0] {
-    case "cwd_logger", "log_cwd":
+    case "cwd_logger", "log_cwd", "go_cwd_logger":
         LogCurrent(collection)
     case "cwd_recently":
         RecentlyFrequencty(collection, Recently)
