@@ -45,7 +45,7 @@ func printTarget(c *mgo.Collection, sort FindType, target int) {
 }
 
 func listRecentyFrequently(c *mgo.Collection, sort FindType) {
-    iter := c.Find(nil).Sort(string(sort)).Limit(15).Iter()
+    iter := c.Find(nil).Sort(string(sort)).Limit(20).Iter()
     item := &Log{}
     i := 0
     fmt.Printf("usage: %s target_index\n",os.Args[0])
@@ -89,7 +89,7 @@ func RemoveDead(c *mgo.Collection) {
         return
     }
     limit := float32(count) * 0.1
-    if limit < 15 {
+    if limit < 20 {
         return
     }
     iter := c.Find(bson.M{"count": bson.M{"$lte": 0.25}}).Sort("last_access").Limit(int(limit)).Iter()
@@ -112,7 +112,7 @@ func main () {
         // mongodb://user:pass@server.mongohq.com/db_name
         uri = "mongodb://localhost/" + os.Getenv("USER")
     }
-    sess, err := mgo.DialWithTimeout(uri,1*time.Second)
+    sess, err := mgo.DialWithTimeout(uri,500*time.Millisecond)
     if nil != err {
         fmt.Fprintf(os.Stderr,"Can't connect to mongo: %v\n", err)
         os.Exit(1)
