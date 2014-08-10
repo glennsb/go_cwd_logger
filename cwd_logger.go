@@ -29,7 +29,7 @@ func LogCurrent(c *mgo.Collection){
     }
 }
 
-func RecentlyFrequencty(c *mgo.Collection, sort FindType){
+func RecentlyFrequently(c *mgo.Collection, sort FindType){
     target := getTarget()
     if target < 0 {
         listRecentyFrequently(c,sort)
@@ -125,9 +125,9 @@ func main () {
     case "cwd_logger", "log_cwd", "go_cwd_logger":
         LogCurrent(collection)
     case "cwd_recently":
-        RecentlyFrequencty(collection, Recently)
+        RecentlyFrequently(collection, Recently)
     case "cwd_frequency":
-        RecentlyFrequencty(collection, Frequently)
+        RecentlyFrequently(collection, Frequently)
     case "cwd_dampen_frequency":
         DampenFrequency(collection)
         RemoveDead(collection)
