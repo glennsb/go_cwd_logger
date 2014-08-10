@@ -11,7 +11,11 @@ Usage
 
 The basic usage is to call ``cwd_logger`` when changing directory (chpwd_functions
 in zsh is a good spot for this). Calling it as ``cwd_recently`` will print out the
-15 most recent directories, runnnig it as ``cwd_frequency`` the 15 most frequent.
+20 most recent directories, runnnig it as ``cwd_frequency`` the 20 most frequent.
+
+For either, passing a numeric argument will then print that directory. Any argument
+other than a number will be treated as a regular expression for a search on all the
+paths logged, returning the first match
 
 ```bash
 user@host:/some/working/dir$ cwd_logger
@@ -21,10 +25,15 @@ usage: cwd_recently index
  0 - /some/working/dir
 user@host:/some/working/dir$ cd /some/other/dir && cwd_logger && cwd_frequency
 usage: cwd_frequency index
+ 0 - /some/other/dir
+ 1 - /some/working/dir
+user@host:/some/other/dir$ cd "$(cwd_frequency 1)"
+user@host:/some/working/dir$ cwd_frequency
+usage: cwd_frequence target_index|path regex
  0 - /some/working/dir
  1 - /some/other/dir
-user@host:/some/other/dir$ cd "$(cwd_frequency 0)"
-user@host:/some/working/dir$
+user@host:/some/working/dir$ cd "$(cwd_frequence other)"
+user@host:/some/other/dir$
 ```
 
 Easiest usage comes from using some shell functions & aliases to these commands,
