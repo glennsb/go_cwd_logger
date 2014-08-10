@@ -22,6 +22,11 @@ type Log struct {
     Count float32       `bson:"count"`
 }
 
+type Target struct {
+  index int
+  regex string
+}
+
 func LogCurrent(c *mgo.Collection){
     path := os.Getenv("PWD")
     if os.Getenv("HOME") != path {
@@ -31,16 +36,23 @@ func LogCurrent(c *mgo.Collection){
 
 func RecentlyFrequently(c *mgo.Collection, sort FindType){
     target := getTarget()
-    if target < 0 {
-        listRecentyFrequently(c,sort)
-    } else {
+    if (target.index >= 0 && "" == target.regex) {
         printTarget(c,sort,target)
+    } else if (target.index < 0 && "" != target.regex) {
+      target.index = 0
+        printTarget(c,sort,target)
+    } else {
+        listRecentyFrequently(c,sort)
     }
 }
 
-func printTarget(c *mgo.Collection, sort FindType, target int) {
+func printTarget(c *mgo.Collection, sort FindType, target Target) {
     item := &Log{}
-    c.Find(nil).Sort(string(sort)).Skip(target).One(item)
+    if "" == target.regex {
+      c.Find(nil).Sort(string(sort)).Skip(target.index).One(item)
+      } else {
+      c.Find( bson.M{"path": bson.M{"$regex": target.regex} } ).Sort(string(sort)).Skip(target.index).One(item)
+      }
     fmt.Println(item.Path)
 }
 
@@ -48,7 +60,7 @@ func listRecentyFrequently(c *mgo.Collection, sort FindType) {
     iter := c.Find(nil).Sort(string(sort)).Limit(20).Iter()
     item := &Log{}
     i := 0
-    fmt.Printf("usage: %s target_index\n",os.Args[0])
+    fmt.Printf("usage: %s target_index|path regex\n",os.Args[0])
     for iter.Next(&item) {
         fmt.Printf("%2d- %s\n",i,item.Path)
         i+=1
@@ -58,16 +70,17 @@ func listRecentyFrequently(c *mgo.Collection, sort FindType) {
     }
 }
 
-func getTarget() int {
+func getTarget() Target {
+    target := Target{index:-1, regex:""}
     if len(os.Args) > 1 {
-        target, err := strconv.Atoi(os.Args[1])
+        var err error
+        target.index, err = strconv.Atoi(os.Args[1])
         if nil != err {
-            fmt.Fprintf(os.Stderr,"Error parsing target: %v\n",err)
-            return -1
+          target.index = -1
+          target.regex = os.Args[1]
         }
-        return target
     }
-    return -1
+    return target
 }
 
 func DampenFrequency(c *mgo.Collection) {
