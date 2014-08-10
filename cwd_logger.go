@@ -97,13 +97,12 @@ func RemoveDead(c *mgo.Collection) {
     for iter.Next(&item) {
         fmt.Printf("Forgetting about %s\n",item.Path)
         if err := c.Remove(bson.M{"_id": item.Id}); nil != err {
-            fmt.Fprintf(os.Stderr,"Error removing item (%v) iter: %v\n",item.Id,err)            
+            fmt.Fprintf(os.Stderr,"Error removing item (%v) iter: %v\n",item.Id,err)
         }
     }
     if err := iter.Close(); err != nil {
         fmt.Fprintf(os.Stderr,"Error closing iter: %v\n",err)
     }
-    
 }
 
 func main () {
