@@ -9,33 +9,33 @@ import (
 	"time"
 )
 
-type FindType string
+type findType string
 
 const (
-	Recently   FindType = "-last_access"
-	Frequently FindType = "-count"
+	recently   findType = "-last_access"
+	frequently findType = "-count"
 )
 
-type Log struct {
+type log struct {
 	Id    bson.ObjectId `bson:"_id"`
 	Path  string        `bson:"path"`
 	Last  time.Time     `bson:"last_access"`
 	Count float32       `bson:"count"`
 }
 
-type Target struct {
+type target struct {
 	index int
 	regex string
 }
 
-func LogCurrent(c *mgo.Collection) {
+func logCurrent(c *mgo.Collection) {
 	path := os.Getenv("PWD")
 	if os.Getenv("HOME") != path {
 		c.Upsert(bson.M{"path": path}, bson.M{"$set": bson.M{"path": path, "last_access": time.Now()}, "$inc": bson.M{"count": 1}})
 	}
 }
 
-func RecentlyFrequently(c *mgo.Collection, sort FindType) {
+func recentlyFrequently(c *mgo.Collection, sort findType) {
 	target := getTarget()
 	if target.index >= 0 && "" == target.regex {
 		printTarget(c, sort, target)
@@ -47,8 +47,8 @@ func RecentlyFrequently(c *mgo.Collection, sort FindType) {
 	}
 }
 
-func printTarget(c *mgo.Collection, sort FindType, target Target) {
-	item := &Log{}
+func printTarget(c *mgo.Collection, sort findType, target target) {
+	item := &log{}
 	if "" == target.regex {
 		c.Find(nil).Sort(string(sort)).Skip(target.index).One(item)
 	} else {
@@ -57,22 +57,22 @@ func printTarget(c *mgo.Collection, sort FindType, target Target) {
 	fmt.Println(item.Path)
 }
 
-func listRecentyFrequently(c *mgo.Collection, sort FindType) {
+func listRecentyFrequently(c *mgo.Collection, sort findType) {
 	iter := c.Find(nil).Sort(string(sort)).Limit(20).Iter()
-	item := &Log{}
+	item := &log{}
 	i := 0
 	fmt.Printf("usage: %s target_index|path regex\n", os.Args[0])
 	for iter.Next(&item) {
 		fmt.Printf("%2d- %s\n", i, item.Path)
-		i += 1
+		i++
 	}
 	if err := iter.Close(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error closing iter: %v\n", err)
 	}
 }
 
-func getTarget() Target {
-	target := Target{index: -1, regex: ""}
+func getTarget() target {
+	target := target{index: -1, regex: ""}
 	if len(os.Args) > 1 {
 		var err error
 		target.index, err = strconv.Atoi(os.Args[1])
@@ -84,9 +84,9 @@ func getTarget() Target {
 	return target
 }
 
-func DampenFrequency(c *mgo.Collection) {
+func dampenFrequency(c *mgo.Collection) {
 	iter := c.Find(nil).Iter()
-	item := &Log{}
+	item := &log{}
 	for iter.Next(&item) {
 		item.Count /= 2.0
 		c.Update(bson.M{"_id": item.Id}, item)
@@ -96,7 +96,7 @@ func DampenFrequency(c *mgo.Collection) {
 	}
 }
 
-func RemoveDead(c *mgo.Collection) {
+func removeDead(c *mgo.Collection) {
 	count, err := c.Count()
 	if nil != err {
 		fmt.Fprintf(os.Stderr, "Can't get collection count: %v\n", err)
@@ -107,7 +107,7 @@ func RemoveDead(c *mgo.Collection) {
 		return
 	}
 	iter := c.Find(bson.M{"count": bson.M{"$lte": 0.25}}).Sort("last_access").Limit(int(limit)).Iter()
-	item := &Log{}
+	item := &log{}
 	for iter.Next(&item) {
 		fmt.Printf("Forgetting about %s\n", item.Path)
 		if err := c.Remove(bson.M{"_id": item.Id}); nil != err {
@@ -136,15 +136,15 @@ func main() {
 
 	switch os.Args[0] {
 	case "cwd_logger", "log_cwd", "go_cwd_logger":
-		LogCurrent(collection)
+		logCurrent(collection)
 	case "cwd_recently":
-		RecentlyFrequently(collection, Recently)
+		recentlyFrequently(collection, recently)
 	case "cwd_frequency":
-		RecentlyFrequently(collection, Frequently)
+		recentlyFrequently(collection, frequently)
 	case "cwd_dampen_frequency":
-		DampenFrequency(collection)
-		RemoveDead(collection)
+		dampenFrequency(collection)
+		removeDead(collection)
 	default:
-		LogCurrent(collection)
+		logCurrent(collection)
 	}
 }
