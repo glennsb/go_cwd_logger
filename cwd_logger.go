@@ -1,149 +1,150 @@
 package main
 
 import (
-    "fmt"
-    "os"
-    "time"
-    "labix.org/v2/mgo"
-    "labix.org/v2/mgo/bson"
-    "strconv"
+	"fmt"
+	"labix.org/v2/mgo"
+	"labix.org/v2/mgo/bson"
+	"os"
+	"strconv"
+	"time"
 )
 
 type FindType string
+
 const (
-    Recently FindType = "-last_access"
-    Frequently FindType = "-count"
+	Recently   FindType = "-last_access"
+	Frequently FindType = "-count"
 )
 
 type Log struct {
-    Id    bson.ObjectId `bson:"_id"`
-    Path  string        `bson:"path"`
-    Last  time.Time     `bson:"last_access"`
-    Count float32       `bson:"count"`
+	Id    bson.ObjectId `bson:"_id"`
+	Path  string        `bson:"path"`
+	Last  time.Time     `bson:"last_access"`
+	Count float32       `bson:"count"`
 }
 
 type Target struct {
-  index int
-  regex string
+	index int
+	regex string
 }
 
-func LogCurrent(c *mgo.Collection){
-    path := os.Getenv("PWD")
-    if os.Getenv("HOME") != path {
-        c.Upsert(bson.M{"path": path}, bson.M{"$set": bson.M{"path": path, "last_access": time.Now()}, "$inc":bson.M{"count":1}})
-    }
+func LogCurrent(c *mgo.Collection) {
+	path := os.Getenv("PWD")
+	if os.Getenv("HOME") != path {
+		c.Upsert(bson.M{"path": path}, bson.M{"$set": bson.M{"path": path, "last_access": time.Now()}, "$inc": bson.M{"count": 1}})
+	}
 }
 
-func RecentlyFrequently(c *mgo.Collection, sort FindType){
-    target := getTarget()
-    if (target.index >= 0 && "" == target.regex) {
-        printTarget(c,sort,target)
-    } else if (target.index < 0 && "" != target.regex) {
-      target.index = 0
-        printTarget(c,sort,target)
-    } else {
-        listRecentyFrequently(c,sort)
-    }
+func RecentlyFrequently(c *mgo.Collection, sort FindType) {
+	target := getTarget()
+	if target.index >= 0 && "" == target.regex {
+		printTarget(c, sort, target)
+	} else if target.index < 0 && "" != target.regex {
+		target.index = 0
+		printTarget(c, sort, target)
+	} else {
+		listRecentyFrequently(c, sort)
+	}
 }
 
 func printTarget(c *mgo.Collection, sort FindType, target Target) {
-    item := &Log{}
-    if "" == target.regex {
-      c.Find(nil).Sort(string(sort)).Skip(target.index).One(item)
-      } else {
-      c.Find( bson.M{"path": bson.M{"$regex": target.regex} } ).Sort(string(sort)).Skip(target.index).One(item)
-      }
-    fmt.Println(item.Path)
+	item := &Log{}
+	if "" == target.regex {
+		c.Find(nil).Sort(string(sort)).Skip(target.index).One(item)
+	} else {
+		c.Find(bson.M{"path": bson.M{"$regex": target.regex}}).Sort(string(sort)).Skip(target.index).One(item)
+	}
+	fmt.Println(item.Path)
 }
 
 func listRecentyFrequently(c *mgo.Collection, sort FindType) {
-    iter := c.Find(nil).Sort(string(sort)).Limit(20).Iter()
-    item := &Log{}
-    i := 0
-    fmt.Printf("usage: %s target_index|path regex\n",os.Args[0])
-    for iter.Next(&item) {
-        fmt.Printf("%2d- %s\n",i,item.Path)
-        i+=1
-    }
-    if err := iter.Close(); err != nil {
-        fmt.Fprintf(os.Stderr,"Error closing iter: %v\n",err)
-    }
+	iter := c.Find(nil).Sort(string(sort)).Limit(20).Iter()
+	item := &Log{}
+	i := 0
+	fmt.Printf("usage: %s target_index|path regex\n", os.Args[0])
+	for iter.Next(&item) {
+		fmt.Printf("%2d- %s\n", i, item.Path)
+		i += 1
+	}
+	if err := iter.Close(); err != nil {
+		fmt.Fprintf(os.Stderr, "Error closing iter: %v\n", err)
+	}
 }
 
 func getTarget() Target {
-    target := Target{index:-1, regex:""}
-    if len(os.Args) > 1 {
-        var err error
-        target.index, err = strconv.Atoi(os.Args[1])
-        if nil != err {
-          target.index = -1
-          target.regex = os.Args[1]
-        }
-    }
-    return target
+	target := Target{index: -1, regex: ""}
+	if len(os.Args) > 1 {
+		var err error
+		target.index, err = strconv.Atoi(os.Args[1])
+		if nil != err {
+			target.index = -1
+			target.regex = os.Args[1]
+		}
+	}
+	return target
 }
 
 func DampenFrequency(c *mgo.Collection) {
-    iter := c.Find(nil).Iter()
-    item := &Log{}
-    for iter.Next(&item) {
-        item.Count /= 2.0
-        c.Update(bson.M{"_id": item.Id},item)
-    }
-    if err := iter.Close(); err != nil {
-        fmt.Fprintf(os.Stderr,"Error closing iter: %v\n",err)
-    }
+	iter := c.Find(nil).Iter()
+	item := &Log{}
+	for iter.Next(&item) {
+		item.Count /= 2.0
+		c.Update(bson.M{"_id": item.Id}, item)
+	}
+	if err := iter.Close(); err != nil {
+		fmt.Fprintf(os.Stderr, "Error closing iter: %v\n", err)
+	}
 }
 
 func RemoveDead(c *mgo.Collection) {
-    count, err := c.Count()
-    if nil != err {
-        fmt.Fprintf(os.Stderr,"Can't get collection count: %v\n",err)
-        return
-    }
-    limit := float32(count) * 0.1
-    if limit < 20 {
-        return
-    }
-    iter := c.Find(bson.M{"count": bson.M{"$lte": 0.25}}).Sort("last_access").Limit(int(limit)).Iter()
-    item := &Log{}
-    for iter.Next(&item) {
-        fmt.Printf("Forgetting about %s\n",item.Path)
-        if err := c.Remove(bson.M{"_id": item.Id}); nil != err {
-            fmt.Fprintf(os.Stderr,"Error removing item (%v) iter: %v\n",item.Id,err)
-        }
-    }
-    if err := iter.Close(); err != nil {
-        fmt.Fprintf(os.Stderr,"Error closing iter: %v\n",err)
-    }
+	count, err := c.Count()
+	if nil != err {
+		fmt.Fprintf(os.Stderr, "Can't get collection count: %v\n", err)
+		return
+	}
+	limit := float32(count) * 0.1
+	if limit < 20 {
+		return
+	}
+	iter := c.Find(bson.M{"count": bson.M{"$lte": 0.25}}).Sort("last_access").Limit(int(limit)).Iter()
+	item := &Log{}
+	for iter.Next(&item) {
+		fmt.Printf("Forgetting about %s\n", item.Path)
+		if err := c.Remove(bson.M{"_id": item.Id}); nil != err {
+			fmt.Fprintf(os.Stderr, "Error removing item (%v) iter: %v\n", item.Id, err)
+		}
+	}
+	if err := iter.Close(); err != nil {
+		fmt.Fprintf(os.Stderr, "Error closing iter: %v\n", err)
+	}
 }
 
-func main () {
-    uri := os.Getenv("CWD_LOGGER_URI")
-    if "" == uri {
-        // mongodb://user:pass@server.mongohq.com/db_name
-        uri = "mongodb://localhost/" + os.Getenv("USER")
-    }
-    sess, err := mgo.DialWithTimeout(uri,500*time.Millisecond)
-    if nil != err {
-        fmt.Fprintf(os.Stderr,"Can't connect to mongo: %v\n", err)
-        os.Exit(1)
-    }
-    defer sess.Close()
+func main() {
+	uri := os.Getenv("CWD_LOGGER_URI")
+	if "" == uri {
+		// mongodb://user:pass@server.mongohq.com/db_name
+		uri = "mongodb://localhost/" + os.Getenv("USER")
+	}
+	sess, err := mgo.DialWithTimeout(uri, 500*time.Millisecond)
+	if nil != err {
+		fmt.Fprintf(os.Stderr, "Can't connect to mongo: %v\n", err)
+		os.Exit(1)
+	}
+	defer sess.Close()
 
-    collection := sess.DB("").C("logged_dirs")
+	collection := sess.DB("").C("logged_dirs")
 
-    switch os.Args[0] {
-    case "cwd_logger", "log_cwd", "go_cwd_logger":
-        LogCurrent(collection)
-    case "cwd_recently":
-        RecentlyFrequently(collection, Recently)
-    case "cwd_frequency":
-        RecentlyFrequently(collection, Frequently)
-    case "cwd_dampen_frequency":
-        DampenFrequency(collection)
-        RemoveDead(collection)
-    default:
-        LogCurrent(collection)
-    }
+	switch os.Args[0] {
+	case "cwd_logger", "log_cwd", "go_cwd_logger":
+		LogCurrent(collection)
+	case "cwd_recently":
+		RecentlyFrequently(collection, Recently)
+	case "cwd_frequency":
+		RecentlyFrequently(collection, Frequently)
+	case "cwd_dampen_frequency":
+		DampenFrequency(collection)
+		RemoveDead(collection)
+	default:
+		LogCurrent(collection)
+	}
 }
